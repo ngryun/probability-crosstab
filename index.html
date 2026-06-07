@@ -1,0 +1,862 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>조건부확률 이중교차표</title>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f4f6f8;
+      --panel: #ffffff;
+      --ink: #20252b;
+      --muted: #64707d;
+      --line: #d9e0e7;
+      --line-strong: #c2ccd6;
+      --accent: #0f766e;
+      --accent-strong: #0b5d56;
+      --accent-soft: #dff4f1;
+      --row: #0f766e;
+      --row-strong: #0b5d56;
+      --row-soft: #e4f5f2;
+      --row-line: #8dcfc5;
+      --col: #2563eb;
+      --col-strong: #1e40af;
+      --col-soft: #e8f0ff;
+      --col-line: #9db9ff;
+      --warning: #a14b12;
+      --shadow: 0 12px 28px rgba(27, 39, 51, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: "Malgun Gothic", "Apple SD Gothic Neo", "Segoe UI", system-ui, sans-serif;
+      letter-spacing: 0;
+    }
+
+    .app {
+      min-height: 100vh;
+      display: grid;
+      grid-template-rows: auto auto 1fr;
+    }
+
+    header {
+      padding: 22px clamp(16px, 3vw, 40px) 16px;
+      border-bottom: 1px solid var(--line);
+      background: #fbfcfd;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(24px, 2.8vw, 36px);
+      line-height: 1.2;
+      font-weight: 800;
+    }
+
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 18px;
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .toolbar {
+      display: grid;
+      grid-template-columns: minmax(190px, 0.9fr) minmax(240px, 1.2fr) minmax(240px, 1.2fr) auto auto auto;
+      gap: 12px;
+      align-items: end;
+      padding: 16px clamp(16px, 3vw, 40px);
+      background: var(--panel);
+      border-bottom: 1px solid var(--line);
+    }
+
+    label {
+      display: grid;
+      gap: 7px;
+      min-width: 0;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .field-title {
+      line-height: 1.2;
+    }
+
+    .question-card {
+      position: relative;
+      gap: 10px;
+      padding: 10px;
+      border: 2px solid var(--line-strong);
+      border-radius: 8px;
+      background: var(--panel);
+    }
+
+    .question-card.axis-row {
+      border-color: var(--row-line);
+      background: linear-gradient(180deg, var(--row-soft), #ffffff 78%);
+    }
+
+    .question-card.axis-col {
+      border-color: var(--col-line);
+      background: linear-gradient(180deg, var(--col-soft), #ffffff 78%);
+    }
+
+    .axis-head {
+      display: flex;
+      min-width: 0;
+      align-items: center;
+      gap: 8px;
+      line-height: 1.2;
+    }
+
+    .axis-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 34px;
+      height: 24px;
+      flex: 0 0 auto;
+      border-radius: 6px;
+      color: #ffffff;
+      font-size: 13px;
+      font-weight: 900;
+    }
+
+    .axis-row .axis-badge {
+      background: var(--row);
+    }
+
+    .axis-col .axis-badge {
+      background: var(--col);
+    }
+
+    .axis-title {
+      color: var(--ink);
+      font-size: 14px;
+      font-weight: 900;
+    }
+
+    .axis-place {
+      min-width: 0;
+      overflow: hidden;
+      color: var(--muted);
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    input[type="file"],
+    select,
+    button {
+      height: 42px;
+      border: 1px solid var(--line-strong);
+      border-radius: 8px;
+      background: var(--panel);
+      color: var(--ink);
+      font: inherit;
+    }
+
+    input[type="file"] {
+      width: 100%;
+      min-width: 0;
+      padding: 8px 10px;
+      font-size: 13px;
+    }
+
+    select {
+      width: 100%;
+      min-width: 0;
+      padding: 0 34px 0 12px;
+    }
+
+    .axis-row select {
+      border-color: var(--row-line);
+    }
+
+    .axis-col select {
+      border-color: var(--col-line);
+    }
+
+    button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      padding: 0 13px;
+      cursor: pointer;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    button.primary {
+      border-color: var(--accent);
+      background: var(--accent);
+      color: #ffffff;
+    }
+
+    button:hover {
+      border-color: var(--accent-strong);
+    }
+
+    button:disabled,
+    select:disabled {
+      cursor: not-allowed;
+      opacity: 0.55;
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: auto minmax(0, 1fr);
+      gap: 10px;
+      padding: 12px clamp(16px, 3vw, 40px) 28px;
+      min-width: 0;
+    }
+
+    .status {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 6px 10px;
+      align-items: start;
+      width: 100%;
+      min-height: 0;
+      min-width: 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .status-axes {
+      display: grid;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .status-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      width: 100%;
+      min-height: 30px;
+      padding: 4px 9px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      color: var(--ink);
+      font-weight: 700;
+    }
+
+    .status-chip strong {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 28px;
+      height: 22px;
+      border-radius: 6px;
+      color: #ffffff;
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .status-chip span {
+      min-width: 0;
+      overflow: visible;
+      text-overflow: clip;
+      white-space: normal;
+      line-height: 1.28;
+    }
+
+    .status-chip.axis-row {
+      border-color: var(--row-line);
+      background: var(--row-soft);
+    }
+
+    .status-chip.axis-row strong {
+      background: var(--row);
+    }
+
+    .status-chip.axis-col {
+      border-color: var(--col-line);
+      background: var(--col-soft);
+    }
+
+    .status-chip.axis-col strong {
+      background: var(--col);
+    }
+
+    .status-count {
+      display: inline-flex;
+      align-items: center;
+      min-height: 30px;
+      padding: 4px 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #ffffff;
+      color: var(--muted);
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .warning {
+      color: var(--warning);
+      font-weight: 800;
+    }
+
+    .table-wrap {
+      overflow: auto;
+      width: 100%;
+      min-width: 0;
+      max-height: calc(100vh - 238px);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+    }
+
+    table {
+      width: 100%;
+      min-width: 760px;
+      border-collapse: separate;
+      border-spacing: 0;
+      font-size: 14px;
+    }
+
+    th,
+    td {
+      border-right: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      padding: 10px 12px;
+      text-align: center;
+      vertical-align: middle;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: var(--col-soft);
+      color: var(--col-strong);
+      font-weight: 800;
+    }
+
+    th:first-child,
+    td:first-child {
+      position: sticky;
+      left: 0;
+      z-index: 1;
+      min-width: 210px;
+      max-width: 340px;
+      overflow-wrap: anywhere;
+      text-align: left;
+      font-weight: 800;
+    }
+
+    td:first-child {
+      background: var(--row-soft);
+      color: var(--row-strong);
+      border-left: 4px solid var(--row);
+    }
+
+    th:first-child {
+      z-index: 3;
+    }
+
+    .corner {
+      min-width: 136px;
+      background: linear-gradient(135deg, var(--row-soft) 0 50%, var(--col-soft) 50% 100%);
+      color: var(--ink);
+    }
+
+    .corner-axis {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .corner-axis span {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 38px;
+      height: 24px;
+      border-radius: 6px;
+      color: #ffffff;
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .corner-row {
+      background: var(--row);
+    }
+
+    .corner-col {
+      background: var(--col);
+    }
+
+    .corner-slash {
+      color: var(--muted);
+      font-weight: 900;
+    }
+
+    .col-header {
+      border-top: 4px solid var(--col);
+    }
+
+    .row-header {
+      background: var(--row-soft);
+      color: var(--row-strong);
+    }
+
+    td.count {
+      min-width: 74px;
+      font-variant-numeric: tabular-nums;
+      font-weight: 800;
+    }
+
+    .total {
+      background: #f2f6f4;
+      color: var(--ink);
+      font-weight: 900;
+    }
+
+    .empty {
+      padding: 38px 20px;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    @media (max-width: 1080px) {
+      .toolbar {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    @media (max-width: 700px) {
+      .toolbar {
+        grid-template-columns: 1fr;
+      }
+
+      .axis-head {
+        flex-wrap: wrap;
+      }
+
+      .axis-place {
+        white-space: normal;
+      }
+
+      .status-chip {
+        width: 100%;
+      }
+
+      .status {
+        grid-template-columns: 1fr;
+      }
+
+      .status-count {
+        width: max-content;
+        max-width: 100%;
+      }
+
+      button {
+        width: 100%;
+      }
+
+      .table-wrap {
+        max-height: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>조건부확률 이중교차표</h1>
+      <div class="meta">
+        <span id="sourceName">data.xlsx</span>
+        <span id="sheetName"></span>
+        <span id="respondentCount"></span>
+      </div>
+    </header>
+
+    <section class="toolbar" aria-label="교차표 설정">
+      <label class="file-field">
+        <span class="field-title">엑셀 파일</span>
+        <input id="fileInput" type="file" accept=".xlsx,.xls,.csv">
+      </label>
+      <label class="question-card axis-row">
+        <span class="axis-head">
+          <span class="axis-badge">행</span>
+          <span class="axis-title">행 질문</span>
+          <span class="axis-place">표 왼쪽 기준</span>
+        </span>
+        <select id="rowQuestion" disabled></select>
+      </label>
+      <label class="question-card axis-col">
+        <span class="axis-head">
+          <span class="axis-badge">열</span>
+          <span class="axis-title">열 질문</span>
+          <span class="axis-place">표 위쪽 기준</span>
+        </span>
+        <select id="colQuestion" disabled></select>
+      </label>
+      <button class="primary" id="swapBtn" type="button" disabled>행/열 바꾸기</button>
+      <button id="copyBtn" type="button" disabled>복사</button>
+      <button id="csvBtn" type="button" disabled>CSV 저장</button>
+    </section>
+
+    <main>
+      <div class="status" id="status">불러오는 중입니다.</div>
+      <div class="table-wrap" id="tableWrap">
+        <div class="empty">data.xlsx를 불러오는 중입니다.</div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const APP_TITLE = "조건부확률 이중교차표";
+    const DEFAULT_WORKBOOK = "data.xlsx";
+    const MISSING_LABEL = "응답 없음";
+
+    const state = {
+      data: null,
+      table: [],
+      rowLabels: [],
+      colLabels: [],
+    };
+
+    const fileInput = document.getElementById("fileInput");
+    const rowSelect = document.getElementById("rowQuestion");
+    const colSelect = document.getElementById("colQuestion");
+    const statusEl = document.getElementById("status");
+    const tableWrap = document.getElementById("tableWrap");
+    const sourceName = document.getElementById("sourceName");
+    const sheetName = document.getElementById("sheetName");
+    const respondentCount = document.getElementById("respondentCount");
+    const swapBtn = document.getElementById("swapBtn");
+    const copyBtn = document.getElementById("copyBtn");
+    const csvBtn = document.getElementById("csvBtn");
+
+    function normalizeCell(value) {
+      if (value === null || value === undefined) return "";
+      if (typeof value === "number" && Number.isInteger(value)) return String(value);
+      return String(value).trim();
+    }
+
+    function isQuestionHeader(header) {
+      const text = normalizeCell(header).toLowerCase();
+      return Boolean(text) && !["타임스탬프", "timestamp", "time stamp"].includes(text);
+    }
+
+    function valueLabel(value) {
+      const trimmed = normalizeCell(value);
+      return trimmed || MISSING_LABEL;
+    }
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, (char) => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+      }[char]));
+    }
+
+    function setControlsEnabled(enabled) {
+      rowSelect.disabled = !enabled;
+      colSelect.disabled = !enabled;
+      swapBtn.disabled = !enabled;
+      copyBtn.disabled = !enabled;
+      csvBtn.disabled = !enabled;
+    }
+
+    function readWorkbookFromArrayBuffer(arrayBuffer) {
+      if (!window.XLSX) {
+        throw new Error("엑셀 파서가 로드되지 않았습니다.");
+      }
+      return XLSX.read(arrayBuffer, {
+        type: "array",
+        cellDates: true,
+      });
+    }
+
+    function loadSurveyData(workbook, workbookName) {
+      const sheetTitle = workbook.SheetNames[0];
+      if (!sheetTitle) {
+        throw new Error("엑셀 파일에 시트가 없습니다.");
+      }
+
+      const worksheet = workbook.Sheets[sheetTitle];
+      const rows = XLSX.utils.sheet_to_json(worksheet, {
+        header: 1,
+        defval: "",
+        raw: false,
+      });
+
+      if (!rows.length) {
+        throw new Error("엑셀 파일에 데이터가 없습니다.");
+      }
+
+      const headers = rows[0].map(normalizeCell);
+      const questionColumns = headers
+        .map((header, index) => ({ header, index }))
+        .filter((column) => isQuestionHeader(column.header));
+
+      if (questionColumns.length < 2) {
+        throw new Error("교차표를 만들 질문 열이 2개 이상 필요합니다.");
+      }
+
+      const responseRows = rows.slice(1)
+        .map((row) => row.map(normalizeCell))
+        .filter((row) => row.some(Boolean))
+        .map((row) => questionColumns.map(({ index }) => row[index] || ""));
+
+      const questions = questionColumns.map(({ header, index }, position) => ({
+        id: position,
+        column: index + 1,
+        title: header,
+        label: `Q${position + 1}. ${header}`,
+      }));
+
+      return {
+        appTitle: APP_TITLE,
+        workbook: workbookName,
+        sheet: sheetTitle,
+        respondents: responseRows.length,
+        missingLabel: MISSING_LABEL,
+        questions,
+        rows: responseRows,
+      };
+    }
+
+    function fillSelects() {
+      const options = state.data.questions.map((question) => {
+        return `<option value="${question.id}">${escapeHtml(question.label)}</option>`;
+      }).join("");
+      rowSelect.innerHTML = options;
+      colSelect.innerHTML = options;
+      rowSelect.value = "0";
+      colSelect.value = state.data.questions.length > 1 ? "1" : "0";
+    }
+
+    function buildTable() {
+      const rowIndex = Number(rowSelect.value);
+      const colIndex = Number(colSelect.value);
+      const rowLabels = [];
+      const colLabels = [];
+      const rowSeen = new Set();
+      const colSeen = new Set();
+      const counts = new Map();
+
+      for (const row of state.data.rows) {
+        const rowValue = valueLabel(row[rowIndex]);
+        const colValue = valueLabel(row[colIndex]);
+
+        if (!rowSeen.has(rowValue)) {
+          rowSeen.add(rowValue);
+          rowLabels.push(rowValue);
+        }
+
+        if (!colSeen.has(colValue)) {
+          colSeen.add(colValue);
+          colLabels.push(colValue);
+        }
+
+        const key = `${rowValue}\u0000${colValue}`;
+        counts.set(key, (counts.get(key) || 0) + 1);
+      }
+
+      const body = [];
+      let maxCount = 0;
+
+      for (const rowLabel of rowLabels) {
+        const values = colLabels.map((colLabel) => {
+          const count = counts.get(`${rowLabel}\u0000${colLabel}`) || 0;
+          maxCount = Math.max(maxCount, count);
+          return count;
+        });
+        body.push({
+          rowLabel,
+          values,
+          total: values.reduce((sum, count) => sum + count, 0),
+        });
+      }
+
+      const colTotals = colLabels.map((colLabel) => {
+        return rowLabels.reduce((sum, rowLabel) => {
+          return sum + (counts.get(`${rowLabel}\u0000${colLabel}`) || 0);
+        }, 0);
+      });
+
+      state.rowLabels = rowLabels;
+      state.colLabels = colLabels;
+      state.table = [
+        ["", ...colLabels, "합계"],
+        ...body.map((item) => [item.rowLabel, ...item.values, item.total]),
+        ["합계", ...colTotals, state.data.rows.length],
+      ];
+
+      renderTable(body, colLabels, colTotals, maxCount);
+      renderStatus(rowIndex, colIndex);
+    }
+
+    function heatStyle(count, maxCount) {
+      if (!maxCount || count === 0) return "";
+      const intensity = Math.max(0.14, count / maxCount);
+      return `background: rgba(15, 118, 110, ${0.10 + intensity * 0.42});`;
+    }
+
+    function renderTable(body, colLabels, colTotals, maxCount) {
+      if (!state.data.rows.length) {
+        tableWrap.innerHTML = '<div class="empty">응답 데이터가 없습니다.</div>';
+        return;
+      }
+
+      let html = '<table><thead><tr><th class="corner"><span class="corner-axis"><span class="corner-row">행</span><b class="corner-slash">/</b><span class="corner-col">열</span></span></th>';
+      for (const label of colLabels) {
+        html += `<th class="col-header">${escapeHtml(label)}</th>`;
+      }
+      html += '<th class="total">합계</th></tr></thead><tbody>';
+
+      for (const item of body) {
+        html += `<tr><td class="row-header">${escapeHtml(item.rowLabel)}</td>`;
+        for (const count of item.values) {
+          html += `<td class="count" style="${heatStyle(count, maxCount)}">${count}</td>`;
+        }
+        html += `<td class="count total">${item.total}</td></tr>`;
+      }
+
+      html += '<tr><td class="total">합계</td>';
+      for (const total of colTotals) {
+        html += `<td class="count total">${total}</td>`;
+      }
+      html += `<td class="count total">${state.data.rows.length}</td></tr>`;
+      html += "</tbody></table>";
+      tableWrap.innerHTML = html;
+    }
+
+    function renderStatus(rowIndex, colIndex) {
+      const rowTitle = state.data.questions[rowIndex]?.title || "";
+      const colTitle = state.data.questions[colIndex]?.title || "";
+      const warning = rowIndex === colIndex
+        ? '<span class="warning">같은 질문이 선택되었습니다.</span>'
+        : "";
+
+      statusEl.innerHTML = [
+        `<span class="status-axes"><span class="status-chip axis-row"><strong>행</strong><span>${escapeHtml(rowTitle)} / 선택지 ${state.rowLabels.length}개</span></span><span class="status-chip axis-col"><strong>열</strong><span>${escapeHtml(colTitle)} / 선택지 ${state.colLabels.length}개</span></span></span>`,
+        `<span class="status-count">전체 ${state.data.rows.length}명</span>`,
+        warning,
+      ].filter(Boolean).join("");
+
+      document.title = `${rowTitle} × ${colTitle}`;
+    }
+
+    function tableToDelimited(delimiter) {
+      return state.table.map((row) => {
+        return row.map((cell) => {
+          const text = String(cell);
+          if (text.includes(delimiter) || text.includes("\n") || text.includes('"')) {
+            return `"${text.replace(/"/g, '""')}"`;
+          }
+          return text;
+        }).join(delimiter);
+      }).join("\n");
+    }
+
+    async function copyTable() {
+      const text = tableToDelimited("\t");
+
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand("copy");
+        textArea.remove();
+      }
+
+      statusEl.insertAdjacentHTML("beforeend", "<span>표를 클립보드에 복사했습니다.</span>");
+    }
+
+    function downloadCsv() {
+      const csv = "\ufeff" + tableToDelimited(",");
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = "conditional_probability_crosstab.csv";
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    function applyData(data) {
+      state.data = data;
+      sourceName.textContent = data.workbook;
+      sheetName.textContent = `시트: ${data.sheet}`;
+      respondentCount.textContent = `응답: ${data.respondents}명`;
+      fillSelects();
+      setControlsEnabled(true);
+      buildTable();
+    }
+
+    async function loadFromFile(file) {
+      const workbook = readWorkbookFromArrayBuffer(await file.arrayBuffer());
+      applyData(loadSurveyData(workbook, file.name));
+    }
+
+    async function loadDefaultWorkbook() {
+      const response = await fetch(DEFAULT_WORKBOOK, { cache: "no-store" });
+      if (!response.ok) {
+        throw new Error("data.xlsx를 찾을 수 없습니다.");
+      }
+      const workbook = readWorkbookFromArrayBuffer(await response.arrayBuffer());
+      applyData(loadSurveyData(workbook, DEFAULT_WORKBOOK));
+    }
+
+    function showError(error) {
+      setControlsEnabled(false);
+      tableWrap.innerHTML = `<div class="empty">${escapeHtml(error.message)}</div>`;
+      statusEl.innerHTML = '<span class="warning">오류가 발생했습니다.</span>';
+    }
+
+    rowSelect.addEventListener("change", buildTable);
+    colSelect.addEventListener("change", buildTable);
+    swapBtn.addEventListener("click", () => {
+      const rowValue = rowSelect.value;
+      rowSelect.value = colSelect.value;
+      colSelect.value = rowValue;
+      buildTable();
+    });
+    copyBtn.addEventListener("click", () => copyTable().catch(showError));
+    csvBtn.addEventListener("click", downloadCsv);
+    fileInput.addEventListener("change", () => {
+      const file = fileInput.files?.[0];
+      if (!file) return;
+      statusEl.textContent = "불러오는 중입니다.";
+      tableWrap.innerHTML = '<div class="empty">엑셀 파일을 불러오는 중입니다.</div>';
+      loadFromFile(file).catch(showError);
+    });
+
+    loadDefaultWorkbook().catch((error) => {
+      tableWrap.innerHTML = `<div class="empty">${escapeHtml(error.message)}</div>`;
+      statusEl.innerHTML = '<span class="warning">엑셀 파일을 선택해 주세요.</span>';
+    });
+  </script>
+</body>
+</html>
