@@ -775,21 +775,88 @@
       }).join("\n");
     }
 
-    async function copyTable() {
-      const text = tableToDelimited("\t");
+    function tableToHtml() {
+      const baseCell = "border:1px solid #8a96a3;padding:6px 9px;text-align:center;vertical-align:middle;";
+      const headerCell = `${baseCell}background:#e8f0ff;color:#1e40af;font-weight:700;`;
+      const rowCell = `${baseCell}background:#e4f5f2;color:#0b5d56;font-weight:700;text-align:left;`;
+      const totalCell = `${baseCell}background:#f2f6f4;color:#20252b;font-weight:700;`;
+      const cornerCell = `${baseCell}background:#eef3f6;color:#20252b;font-weight:700;text-align:center;`;
 
+      let html = '<table style="border-collapse:collapse;font-family:Malgun Gothic,Arial,sans-serif;font-size:11pt;">';
+
+      state.table.forEach((row, rowIndex) => {
+        html += "<tr>";
+        row.forEach((cell, colIndex) => {
+          const isHeader = rowIndex === 0;
+          const isFirstColumn = colIndex === 0;
+          const isTotal = rowIndex === state.table.length - 1 || colIndex === row.length - 1;
+          const tag = isHeader ? "th" : "td";
+          let style = baseCell;
+          let text = cell;
+
+          if (isHeader) style = headerCell;
+          if (isFirstColumn) style = rowCell;
+          if (isTotal) style = totalCell;
+          if (rowIndex === 0 && colIndex === 0) {
+            style = cornerCell;
+            text = "행/열";
+          }
+
+          html += `<${tag} style="${style}">${escapeHtml(text)}</${tag}>`;
+        });
+        html += "</tr>";
+      });
+
+      html += "</table>";
+      return html;
+    }
+
+    async function copyPlainText(text) {
       if (navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(text);
-      } else {
-        const textArea = document.createElement("textarea");
-        textArea.value = text;
-        document.body.appendChild(textArea);
-        textArea.select();
-        document.execCommand("copy");
-        textArea.remove();
+        return;
       }
 
-      statusEl.insertAdjacentHTML("beforeend", "<span>표를 클립보드에 복사했습니다.</span>");
+      const textArea = document.createElement("textarea");
+      textArea.value = text;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand("copy");
+      textArea.remove();
+    }
+
+    async function copyTable() {
+      const text = tableToDelimited("\t");
+      const html = tableToHtml();
+      let copiedHtml = false;
+
+      if (navigator.clipboard?.write && window.ClipboardItem) {
+        try {
+          await navigator.clipboard.write([
+            new ClipboardItem({
+              "text/html": new Blob([html], { type: "text/html" }),
+              "text/plain": new Blob([text], { type: "text/plain" }),
+            }),
+          ]);
+          copiedHtml = true;
+        } catch (_error) {
+          await copyPlainText(text);
+        }
+      } else {
+        await copyPlainText(text);
+      }
+
+      const message = copiedHtml
+        ? "테두리 표를 복사했습니다."
+        : "표를 일반 텍스트로 복사했습니다.";
+      statusEl.insertAdjacentHTML("beforeend", `<span class="status-count">${message}</span>`);
+    }
+
+    function showCopyError(error) {
+      statusEl.insertAdjacentHTML(
+        "beforeend",
+        `<span class="warning">복사하지 못했습니다: ${escapeHtml(error.message)}</span>`
+      );
     }
 
     function downloadCsv() {
@@ -843,7 +910,7 @@
       colSelect.value = rowValue;
       buildTable();
     });
-    copyBtn.addEventListener("click", () => copyTable().catch(showError));
+    copyBtn.addEventListener("click", () => copyTable().catch(showCopyError));
     csvBtn.addEventListener("click", downloadCsv);
     fileInput.addEventListener("change", () => {
       const file = fileInput.files?.[0];
