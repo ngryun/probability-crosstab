@@ -514,8 +514,8 @@ HTML = r"""<!doctype html>
       document.title = `${rowTitle} × ${colTitle}`;
     }
 
-    function tableToDelimited(delimiter) {
-      return state.table.map((row) => row.map((cell) => {
+    function rowsToDelimited(rows, delimiter) {
+      return rows.map((row) => row.map((cell) => {
         const text = String(cell);
         if (text.includes(delimiter) || text.includes("\n") || text.includes('"')) {
           return `"${text.replace(/"/g, '""')}"`;
@@ -524,10 +524,37 @@ HTML = r"""<!doctype html>
       }).join(delimiter)).join("\n");
     }
 
+    function tableToDelimited(delimiter) {
+      return rowsToDelimited(state.table, delimiter);
+    }
+
+    function selectedQuestionLabels() {
+      const rowQuestion = state.data?.questions[Number(rowSelect.value)];
+      const colQuestion = state.data?.questions[Number(colSelect.value)];
+      return {
+        row: rowQuestion?.label || rowQuestion?.title || "",
+        col: colQuestion?.label || colQuestion?.title || "",
+      };
+    }
+
+    function copyRows() {
+      const questions = selectedQuestionLabels();
+      return [
+        ["행 질문", questions.row],
+        ["열 질문", questions.col],
+        [],
+        ...state.table,
+      ];
+    }
+
+    function copyToDelimited(delimiter) {
+      return rowsToDelimited(copyRows(), delimiter);
+    }
+
     async function copyTable() {
-      const text = tableToDelimited("\t");
+      const text = copyToDelimited("\t");
       await navigator.clipboard.writeText(text);
-      statusEl.insertAdjacentHTML("beforeend", "<span>표를 클립보드에 복사했습니다.</span>");
+      statusEl.insertAdjacentHTML("beforeend", "<span>질문과 표를 클립보드에 복사했습니다.</span>");
     }
 
     function downloadCsv() {

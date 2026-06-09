@@ -763,8 +763,8 @@
       document.title = `${rowTitle} × ${colTitle}`;
     }
 
-    function tableToDelimited(delimiter) {
-      return state.table.map((row) => {
+    function rowsToDelimited(rows, delimiter) {
+      return rows.map((row) => {
         return row.map((cell) => {
           const text = String(cell);
           if (text.includes(delimiter) || text.includes("\n") || text.includes('"')) {
@@ -775,14 +775,50 @@
       }).join("\n");
     }
 
+    function tableToDelimited(delimiter) {
+      return rowsToDelimited(state.table, delimiter);
+    }
+
+    function selectedQuestionLabels() {
+      const rowQuestion = state.data?.questions[Number(rowSelect.value)];
+      const colQuestion = state.data?.questions[Number(colSelect.value)];
+      return {
+        row: rowQuestion?.label || rowQuestion?.title || "",
+        col: colQuestion?.label || colQuestion?.title || "",
+      };
+    }
+
+    function copyRows() {
+      const questions = selectedQuestionLabels();
+      return [
+        ["행 질문", questions.row],
+        ["열 질문", questions.col],
+        [],
+        ...state.table,
+      ];
+    }
+
+    function copyToDelimited(delimiter) {
+      return rowsToDelimited(copyRows(), delimiter);
+    }
+
     function tableToHtml() {
       const baseCell = "border:1px solid #8a96a3;padding:6px 9px;text-align:center;vertical-align:middle;";
       const headerCell = `${baseCell}background:#e8f0ff;color:#1e40af;font-weight:700;`;
       const rowCell = `${baseCell}background:#e4f5f2;color:#0b5d56;font-weight:700;text-align:left;`;
       const totalCell = `${baseCell}background:#f2f6f4;color:#20252b;font-weight:700;`;
       const cornerCell = `${baseCell}background:#eef3f6;color:#20252b;font-weight:700;text-align:center;`;
+      const metaLabelCell = `${baseCell}background:#f8fafc;color:#374151;font-weight:700;text-align:left;`;
+      const metaValueCell = `${baseCell}background:#ffffff;color:#111827;text-align:left;`;
+      const spacerCell = "border:0;padding:4px;";
+      const questions = selectedQuestionLabels();
+      const columnCount = Math.max(2, state.table[0]?.length || 0);
+      const valueSpan = Math.max(1, columnCount - 1);
 
       let html = '<table style="border-collapse:collapse;font-family:Malgun Gothic,Arial,sans-serif;font-size:11pt;">';
+      html += `<tr><th style="${metaLabelCell}">행 질문</th><td colspan="${valueSpan}" style="${metaValueCell}">${escapeHtml(questions.row)}</td></tr>`;
+      html += `<tr><th style="${metaLabelCell}">열 질문</th><td colspan="${valueSpan}" style="${metaValueCell}">${escapeHtml(questions.col)}</td></tr>`;
+      html += `<tr><td colspan="${columnCount}" style="${spacerCell}"></td></tr>`;
 
       state.table.forEach((row, rowIndex) => {
         html += "<tr>";
@@ -826,7 +862,7 @@
     }
 
     async function copyTable() {
-      const text = tableToDelimited("\t");
+      const text = copyToDelimited("\t");
       const html = tableToHtml();
       let copiedHtml = false;
 
@@ -847,8 +883,8 @@
       }
 
       const message = copiedHtml
-        ? "테두리 표를 복사했습니다."
-        : "표를 일반 텍스트로 복사했습니다.";
+        ? "질문과 테두리 표를 복사했습니다."
+        : "질문과 표를 일반 텍스트로 복사했습니다.";
       statusEl.insertAdjacentHTML("beforeend", `<span class="status-count">${message}</span>`);
     }
 
